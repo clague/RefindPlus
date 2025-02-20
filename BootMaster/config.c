@@ -3148,6 +3148,25 @@ VOID ReadConfig (
                 GlobalConfig.IconSizes[ICON_SIZE_BADGE] = i / 4;
             }
         }
+        else if (
+            TokenCount == 2 &&
+            MyStriCmp (TokenList[0], L"boot_icon_size")
+        ) {
+            #if REFIT_DEBUG > 0
+            if (!OuterLoop) {
+                UpdatedToken = LogUpdate (
+                    TokenList[0], NotRunBefore, TRUE
+                );
+            }
+            #endif
+
+            HandleUnsignedInt (
+                TokenList, TokenCount, &i
+            );
+            if (i >= 32) {
+                GlobalConfig.IconSizes[ICON_SIZE_BOOT] = i;
+            }
+        }
         else if (MyStriCmp (TokenList[0], L"selection_small")) {
             #if REFIT_DEBUG > 0
             if (!OuterLoop) {

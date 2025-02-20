@@ -104,6 +104,7 @@ CHAR16         *ValidText     = L"Invalid Loader";
 extern BOOLEAN  IsBoot;
 extern BOOLEAN  ShimFound;
 extern BOOLEAN  SecureFlag;
+extern BOOLEAN  GraphicsScreenDirty;
 
 static
 VOID WarnSecureBootError(
@@ -720,7 +721,7 @@ EFI_STATUS StartEFIImage (
         // Stall appears to be only needed on REL builds
         if (!IsDriver && (!AllowGraphicsMode || Verbose)) {
             // DA-TAG: 100 Loops == 1 Sec
-            RefitStall (50);
+            // RefitStall (50);
         }
         #endif
 
@@ -834,67 +835,7 @@ EFI_STATUS StartEFIImage (
                     )
                 )
             ) {
-                if (!Verbose) {
-                    if (ScreenW > 1024 && ScreenH > 1024) {
-                        // Stash current size
-                        OrigIconBig = GlobalConfig.IconSizes[ICON_SIZE_BIG];
-
-                        // Set scale factor
-                        if (0);
-                        else if (OrigIconBig >= 256) ScaleLogo = 1;
-                        else if (OrigIconBig >= 128) ScaleLogo = 2;
-                        else if (OrigIconBig >=  64) ScaleLogo = 4;
-                        else                         ScaleLogo = 8;
-
-                        // Apply scale factor
-                        GlobalConfig.IconSizes[ICON_SIZE_BIG] *= ScaleLogo;
-                    }
-
-                    BootLogoImage = LoadOSIcon (NULL, EXIT_SPLASH, TRUE);
-                    if (BootLogoImage == NULL) {
-                        TmpStr = NULL;
-
-                        if (OSType == 'L') {
-                            GuessLinuxDistribution (&TmpStr, Volume, Filename, FALSE);
-                        }
-
-                        if (TmpStr == NULL) {
-                            TmpStr = StrDuplicate (Volume->OSIconName);
-                        }
-
-                        ToLower (TmpStr);
-
-                        BootLogoImage = LoadOSIcon (
-                            TmpStr,
-                            (OSType == 'L') ? L"linux" : L"windows",
-                            TRUE
-                        );
-
-                        MY_FREE_POOL(TmpStr);
-                    }
-
-                    if (BootLogoImage != NULL) {
-                        BltImageAlpha (
-                            BootLogoImage,
-                            (ScreenW - BootLogoImage->Width ) >> 1,
-                            (ScreenH - BootLogoImage->Height) >> 1,
-                            &(GlobalConfig.ScreenBackground->PixelData[0])
-                        );
-
-                        // Avoid mere flash
-                        //
-                        // Wait 0.75 seconds
-                        // DA-TAG: 100 Loops == 1 Sec
-                        RefitStall (75);
-                    }
-
-                    if (ScreenW > 1024 && ScreenH > 1024) {
-                        // Reset to stashed size
-                        GlobalConfig.IconSizes[ICON_SIZE_BIG] = OrigIconBig;
-                    }
-
-                    MY_FREE_IMAGE(BootLogoImage);
-                } // if !Verbose
+                
 
                 if (OSType == 'L' && GlobalConfig.WriteSystemdVars) {
                     // Inform SystemD of RefindPlus ESP
@@ -1229,8 +1170,9 @@ VOID StartLoader (
     IN CHAR16       *SelectionName,
     IN BOOLEAN       TrustSynced
 ) {
-    CHAR16 *LoaderPath;
-
+    CHAR16* TmpStr;
+    UINTN OrigIconBig;
+    EG_IMAGE* BootLogoImage;
 
     IsBoot        = TRUE;
     BootSelection = SelectionName;
@@ -1245,21 +1187,86 @@ VOID StartLoader (
         DoEnableAndLockVMX();
     }
 
-    BeginExternalScreen (Entry->UseGraphicsMode, SelectionName);
+    if (Entry->UseGraphicsMode) {
+        // Stash current size
+        OrigIconBig = GlobalConfig.IconSizes[ICON_SIZE_BIG];
+        if (ScreenW > 1024 && ScreenH > 1024) {
+            // // Set scale factor
+            // if (0);
+            // else if (OrigIconBig >= 256) ScaleLogo = 1;
+            // else if (OrigIconBig >= 128) ScaleLogo = 2;
+            // else if (OrigIconBig >=  64) ScaleLogo = 4;
+            // else                         ScaleLogo = 8;
 
-    LoaderPath = Basename (Entry->LoaderPath);
+            // Apply scale factor
+            GlobalConfig.IconSizes[ICON_SIZE_BIG] = GlobalConfig.IconSizes[ICON_SIZE_BOOT];
+        }
+        TmpStr = NULL;
+
+        if (Entry->OSType == 'L') {
+            GuessLinuxDistribution (&TmpStr, Entry->Volume, Entry->LoaderPath, FALSE);
+        }
+
+        if (TmpStr == NULL) {
+            TmpStr = StrDuplicate (Entry->Volume->OSIconName);
+        }
+
+        ToLower (TmpStr);
+
+        BootLogoImage = LoadOSIcon (
+            TmpStr,
+            (Entry->OSType == 'L') ? L"linux" : L"windows",
+            TRUE
+        );
+
+        MY_FREE_POOL(TmpStr);
+
+        if (BootLogoImage != NULL) {
+            egClearScreen (&(GlobalConfig.ScreenBackground->PixelData[0]));
+            BltImageAlpha (
+                BootLogoImage,
+                (ScreenW - BootLogoImage->Width ) >> 1,
+                (ScreenH - BootLogoImage->Height) >> 1,
+                &(GlobalConfig.ScreenBackground->PixelData[0])
+            );
+
+            // Avoid mere flash
+            //
+            // Wait 0.75 seconds
+            // DA-TAG: 100 Loops == 1 Sec
+            RefitStall (75);
+        } else {
+            egClearScreen (GlobalConfig.ScreenBackground->PixelData);
+        }
+
+        // Reset to stashed size
+        GlobalConfig.IconSizes[ICON_SIZE_BIG] = OrigIconBig;
+
+        MY_FREE_IMAGE(BootLogoImage);
+    } // if !Verbose
+
+    else if (egIsGraphicsModeEnabled()) {
+        egClearScreen (GlobalConfig.ScreenBackground->PixelData);
+    }
+
+    else {
+        BeginExternalScreen(Entry->UseGraphicsMode, SelectionName);
+    }
+    GraphicsScreenDirty = FALSE;
+
+    TmpStr = Basename (Entry->LoaderPath);
 
     StartEFIImage (
         Entry->Volume,
         Entry->LoaderPath,
         Entry->LoadOptions,
-        LoaderPath,
+        TmpStr,
         Entry->OSType,
         !Entry->UseGraphicsMode,
         FALSE, NULL
     );
 
-    MY_FREE_POOL(LoaderPath);
+    MY_FREE_POOL(TmpStr);
 } // VOID StartLoader()
 
 // Launch an EFI tool (a shell, SB management utility, etc.)

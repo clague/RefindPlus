@@ -62,7 +62,7 @@
 #include <efiConsoleControl.h>
 
 #ifndef __MAKEWITH_GNUEFI
-#define LibLocateProtocol EfiLibLocateProtocol
+#define LibLocateProtocol Efi/LibLocateProtocol
 #define LibOpenRoot EfiLibOpenRoot
 #else
 #include <efilib.h>

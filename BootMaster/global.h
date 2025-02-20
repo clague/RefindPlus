@@ -161,6 +161,7 @@
 #define ICON_SIZE_SMALL           (1)
 #define ICON_SIZE_BIG             (2)
 #define ICON_SIZE_MOUSE           (3)
+#define ICON_SIZE_BOOT            (4)
 
 // Minimum resolutions for a screen to be considered High-DPI
 #define EXDPI_LONG             (6400)
@@ -581,7 +582,7 @@ typedef struct {
     CHAR16                     *ExtraKernelVersionStrings;
     CHAR16                     *SpoofOSXVersion;
     UINT32_LIST                *CsrValues;
-    UINTN                       IconSizes[4];
+    UINTN                       IconSizes[5];
     UINTN                       ShowTools[NUM_TOOLS];
     CHAR8                       ScanFor[NUM_SCAN_OPTIONS];
 } REFIT_CONFIG;
